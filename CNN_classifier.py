@@ -2,6 +2,7 @@ import tensorflow as tf
 import time
 from collections import deque
 from utils import loadData
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -11,7 +12,13 @@ class Classifier(object):
         self.sess = tf.Session()
         self.build_netword()
         self.sess.run(tf.global_variables_initializer())
+        self.accHist = deque()
+        self.lossHist = deque()
 
+    def reset(self):
+        self.sess.run(tf.global_variables_initializer())
+        self.accHist = deque()
+        self.lossHist = deque()
 
     def build_netword(self):
         # build network
@@ -72,28 +79,36 @@ class Classifier(object):
         #
         # dropout2 = tf.layers.dropout(inputs=dense2, rate=0.5)
 
-        logits = tf.layers.dense(inputs=dropout1, units=1, name='logits')
+        self.logits = tf.layers.dense(inputs=dropout1, units=1, name='logits')
 
-        self.loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=self.y, logits=logits)
+        self.loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=self.y, logits=self.logits)
 
-        self.predictions = tf.round(tf.nn.sigmoid(logits))
+        self.predictions = tf.round(tf.nn.sigmoid(self.logits))
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictions, self.y), tf.float32))
         self.opt = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(self.loss)
 
-    def get_performance(self, X_train, Y_train, X_valid, Y_valid):
+    def getProb(self, sample_x):
+        sample_x = sample_x.reshape(1, -1)
+        prob = np.zeros(2)
+        cls, value = self.sess.run([self.predictions, tf.nn.sigmoid(self.logits)], {self.x: sample_x})
+        prob[int(cls)] = value
+        prob[1-int(cls)] = 1 - value
+        return prob
+
+    def get_performance(self, X_train, Y_train, X_valid, Y_valid, new=False):
 
         accHist, lossHist = deque(), deque()
         start_time = time.time()
         t = 0
-        for epoch in range(8):
+        for epoch in range(2):
             # training
             batchSize = 32
             for start, end in zip(range(0, len(X_train), batchSize), range(batchSize, len(X_train)+batchSize, batchSize)):
-                if t % 10 == 0:
-                    # testing
-                    acc_valid, pred_valid, loss_valid = self.sess.run([self.accuracy, self.predictions, self.loss], {self.x: X_valid, self.y: Y_valid})
-                    print("Validation: Step: %i" % t, "| Accurate: %.2f" % acc_valid, "| Loss: %.2f" % loss_valid, )
-                    # print('')
+                # if t % 10 == 0:
+                #     # testing
+                #     acc_valid, pred_valid, loss_valid = self.sess.run([self.accuracy, self.predictions, self.loss], {self.x: X_valid, self.y: Y_valid})
+                #     print("Validation: Step: %i" % t, "| Accurate: %.2f" % acc_valid, "| Loss: %.2f" % loss_valid, )
+                #     # print('')
                 _, acc_, pred_, loss_ = self.sess.run([self.opt, self.accuracy, self.predictions, self.loss],
                                                  {self.x: X_train[start:end], self.y: Y_train[start:end]})
                 # acc_valid, loss_valid = self.sess.run([self.accuracy, self.loss],
@@ -102,14 +117,18 @@ class Classifier(object):
                 lossHist.append(loss_)
                 t += 1
         end_time = time.time()
-        print('spent: %.4fs' % (end_time - start_time))
-        final_acc = self.sess.run(self.accuracy, {self.x: X_valid, self.y: Y_valid})
-        print("Validation Accurate: %.2f" % final_acc)
+        train_acc, train_loss = self.sess.run([self.accuracy, self.loss], {self.x: X_train, self.y: Y_train})
+        final_acc, final_loss = self.sess.run([self.accuracy, self.loss], {self.x: X_valid, self.y: Y_valid})
+        self.accHist.append(final_acc)
+        self.lossHist.append(final_loss)
+        # if new:
+        # print('spent: %.4fs' % (end_time - start_time))
+        print("Validation Accuracy: %.3f, Training Accuracy: %.3f" % (final_acc, train_acc))
+        # print('--------------------------------------------------------------------------')
 
-        sns.lineplot(x=range(t), y=accHist, label='accuracy')
-        sns.lineplot(x=range(t), y=lossHist, label='loss')
-        plt.show()
-
+        # sns.lineplot(x=range(t), y=accHist, label='accuracy')
+        # sns.lineplot(x=range(t), y=lossHist, label='loss')
+        # plt.show()
 
         return final_acc
 
@@ -117,6 +136,18 @@ class Classifier(object):
 if __name__ == '__main__':
     X_train, Y_train, X_valid, Y_valid = loadData()
     clf = Classifier()
-    clf.get_performance(X_train, Y_train, X_valid, Y_valid)
-
+    maxAcc = 0
+    minAcc = 1
+    for i in range(100):
+        seed_id = np.random.choice(len(X_train), 100)
+        X_train_new = X_train[seed_id]
+        Y_train_new = Y_train[seed_id]
+        clf.reset()
+        acc = clf.get_performance(X_train_new, Y_train_new, X_valid, Y_valid)
+        if acc > maxAcc:
+            maxAcc = acc
+        if acc < minAcc:
+            minAcc = acc
+    print('maximal accuracy: ', maxAcc)
+    print('minimal accuracy: ', minAcc)
 
