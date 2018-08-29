@@ -5,12 +5,16 @@ import tensorflow as tf
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from datetime import datetime
 
 MAX_EPISODES = 100
-ON_TRAIN = False
+ON_TRAIN = True
 OUTPUT_GRAPH = False
 LR_A = 0.001    # learning rate for actor
 LR_C = 0.01
+
+now = datetime.now()
+modelPath = now.strftime("%Y%m%d-%H%M%S")
 
 # set env
 env = DataEnv()
@@ -34,12 +38,12 @@ steps = []
 
 def save():
     saver = tf.train.Saver()
-    saver.save(sess, './RLmodel/AC', write_meta_graph=False)
+    saver.save(sess, './RLmodel/' + modelPath, write_meta_graph=False)
 
 
 def restore():
     saver = tf.train.Saver()
-    saver.restore(sess, './RLmodel/AC')
+    saver.restore(sess, './RLmodel/' + modelPath)
 
 def train():
     accHist = np.zeros([MAX_EPISODES, env.budgets + 1])

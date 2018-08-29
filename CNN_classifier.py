@@ -65,9 +65,9 @@ class Classifier(object):
         scale3 = tf.Variable(tf.ones([1024]))
         beta3 = tf.Variable(tf.zeros([1024]))
         dense1 = scale3 * z3_hat + beta3
-        dense1 = tf.nn.relu(dense1)
+        self.dense1 = tf.nn.relu(dense1)
 
-        dropout1 = tf.layers.dropout(inputs=dense1, rate=0.5, name='dropout1')
+        dropout1 = tf.layers.dropout(inputs=self.dense1, rate=0.5, name='dropout1')
 
         # dense2 = tf.layers.dense(inputs=dropout1, units=512, activation=None, name='dense2')
         # batch_mean4, batch_var4 = tf.nn.moments(dense2,[0])
@@ -87,6 +87,11 @@ class Classifier(object):
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictions, self.y), tf.float32))
         self.opt = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(self.loss)
 
+    def getFeatures(self, x):
+        if len(x.shape) == 1:
+            x = x.reshape(1, -1)
+        return self.sess.run(self.dense1, {self.x: x})
+
     def getProb(self, sample_x):
         sample_x = sample_x.reshape(1, -1)
         prob = np.zeros(2)
@@ -100,9 +105,9 @@ class Classifier(object):
         accHist, lossHist = deque(), deque()
         start_time = time.time()
         t = 0
-        for epoch in range(2):
+        for epoch in range(8):
             # training
-            batchSize = 32
+            batchSize = 16
             for start, end in zip(range(0, len(X_train), batchSize), range(batchSize, len(X_train)+batchSize, batchSize)):
                 # if t % 10 == 0:
                 #     # testing
@@ -136,18 +141,19 @@ class Classifier(object):
 if __name__ == '__main__':
     X_train, Y_train, X_valid, Y_valid = loadData()
     clf = Classifier()
-    maxAcc = 0
-    minAcc = 1
-    for i in range(100):
-        seed_id = np.random.choice(len(X_train), 100)
-        X_train_new = X_train[seed_id]
-        Y_train_new = Y_train[seed_id]
-        clf.reset()
-        acc = clf.get_performance(X_train_new, Y_train_new, X_valid, Y_valid)
-        if acc > maxAcc:
-            maxAcc = acc
-        if acc < minAcc:
-            minAcc = acc
-    print('maximal accuracy: ', maxAcc)
-    print('minimal accuracy: ', minAcc)
+    # maxAcc = 0
+    # minAcc = 1
+    # for i in range(100):
+    #     seed_id = np.random.choice(len(X_train), 100)
+    #     X_train_new = X_train[seed_id]
+    #     Y_train_new = Y_train[seed_id]
+    #     clf.reset()
+    #     acc = clf.get_performance(X_train_new, Y_train_new, X_valid, Y_valid)
+    #     if acc > maxAcc:
+    #         maxAcc = acc
+    #     if acc < minAcc:
+    #         minAcc = acc
+    # print('maximal accuracy: ', maxAcc)
+    # print('minimal accuracy: ', minAcc)
 
+    acc = clf.get_performance(X_train, Y_train, X_valid, Y_valid)

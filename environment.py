@@ -40,27 +40,27 @@ class DataEnv(object):
     num_classes = len(label_set)
 
     def __init__(self):
-        # self.X_train_features = self.get_features(self.X_train)
-        # self.X_valid_features = self.get_features(self.X_valid)
+        self.X_train_features = self.get_features(self.X_train)
+        self.X_valid_features = self.get_features(self.X_valid)
 
-        self.X_train_features = self.X_train
-        self.X_valid_features = self.X_valid
+        # self.X_train = self.X_train
+        # self.X_valid = self.X_valid
 
         self.seed_id = np.arange(10)
         self.unlabeled_id = np.arange(10, len(self.X_train))
 
         np.random.shuffle(self.unlabeled_id)
 
-        self.seed_x = self.X_train_features[self.seed_id]
+        self.seed_x = self.X_train[self.seed_id]
         self.seed_y = self.Y_train[self.seed_id]
 
         self.budgets = 90
 
-    def compute_dist(self, sample_x):
+    def compute_dist(self, sample_x_feature):
         nearest_dist = np.ones(self.num_classes) * 1e6
         all_dist = defaultdict(deque)
-        for i,x in enumerate(self.labeled_x):
-            dist = np.linalg.norm(x - sample_x)
+        for i,x in enumerate(self.labeled_x_features):
+            dist = np.linalg.norm(x - sample_x_feature)
             c = int(self.labeled_y[i])
             all_dist[c].append(dist)
             if dist < nearest_dist[c]:
@@ -92,7 +92,7 @@ class DataEnv(object):
             self.query()
             # if self.queried_time % 10 == 0:
             self.get_labeled_data()
-            new_performance = classifier.get_performance(self.labeled_x, self.labeled_y, self.X_valid_features, self.Y_valid, new=True)
+            new_performance = classifier.get_performance(self.labeled_x, self.labeled_y, self.X_valid, self.Y_valid, new=True)
             reward = new_performance - self.performance
             if new_performance != self.performance:
                 self.performance = new_performance
@@ -118,7 +118,7 @@ class DataEnv(object):
 
     def reset(self, classifier):
         np.random.shuffle(self.unlabeled_id)
-        self.unlabeled_x = self.X_train_features[self.unlabeled_id]
+        self.unlabeled_x = self.X_train[self.unlabeled_id]
         self.unlabeled_y = self.Y_train[self.unlabeled_id]
 
         self.queried_time = 0
@@ -128,10 +128,12 @@ class DataEnv(object):
         self.queried_set_x = deque()
         self.queried_set_y = deque()
 
-        sample_x = self.unlabeled_x[self.current_frame]
         self.get_labeled_data()
-        neighbor_dist, all_dist = self.compute_dist(sample_x)
-        self.performance = classifier.get_performance(self.labeled_x, self.labeled_y, self.X_valid_features, self.Y_valid)
+        self.performance = classifier.get_performance(self.labeled_x, self.labeled_y, self.X_valid, self.Y_valid)
+        sample_x = self.unlabeled_x[self.current_frame]
+        sample_x_feature = classifier.getFeatures(sample_x)
+        self.labeled_x_features = classifier.getFeatures(self.labeled_x)
+        neighbor_dist, all_dist = self.compute_dist(sample_x_feature)
         predictions = classifier.getProb(sample_x)
         observation = np.hstack((neighbor_dist, predictions))
         return observation
