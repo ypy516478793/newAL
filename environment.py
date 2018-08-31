@@ -54,7 +54,7 @@ class DataEnv(object):
         self.seed_x = self.X_train[self.seed_id]
         self.seed_y = self.Y_train[self.seed_id]
 
-        self.budgets = 90
+        self.budgets = 10
 
     def compute_dist(self, sample_x_feature):
         nearest_dist = np.ones(self.num_classes) * 1e6
@@ -69,8 +69,9 @@ class DataEnv(object):
 
     def get_frame(self, classifier):
         sample_x = self.unlabeled_x[self.current_frame]
-        # sample_y = self.unlabeled_y[self.current_frame]
-        neighbor_dist, all_dist = self.compute_dist(sample_x)
+        sample_x_feature = classifier.getFeatures(sample_x)
+        self.labeled_x_features = classifier.getFeatures(self.labeled_x)
+        neighbor_dist, all_dist = self.compute_dist(sample_x_feature)
         predictions = classifier.getProb(sample_x)
         observation = np.hstack((neighbor_dist, predictions))
         return observation

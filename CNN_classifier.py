@@ -34,11 +34,11 @@ class Classifier(object):
             padding="same",
             activation=None,
             name='conv1')
-        batch_mean1, batch_var1 = tf.nn.moments(conv1, [0, 1, 2])
-        z1_hat = (conv1 - batch_mean1) / tf.sqrt(batch_var1 + epsilon)
-        scale1 = tf.Variable(tf.ones([32]))
-        beta1 = tf.Variable(tf.zeros([32]))
-        conv1 = scale1 * z1_hat + beta1
+        # batch_mean1, batch_var1 = tf.nn.moments(conv1, [0, 1, 2])
+        # z1_hat = (conv1 - batch_mean1) / tf.sqrt(batch_var1 + epsilon)
+        # scale1 = tf.Variable(tf.ones([32]))
+        # beta1 = tf.Variable(tf.zeros([32]))
+        # conv1 = scale1 * z1_hat + beta1
         conv1 = tf.nn.relu(conv1)
 
         pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2, name='pool1')
@@ -49,22 +49,22 @@ class Classifier(object):
             padding="same",
             activation=None,
             name='conv2')
-        batch_mean2, batch_var2 = tf.nn.moments(conv2, [0, 1, 2])
-        z2_hat = (conv2 - batch_mean2) / tf.sqrt(batch_var2 + epsilon)
-        scale2 = tf.Variable(tf.ones([64]))
-        beta2 = tf.Variable(tf.zeros([64]))
-        conv2 = scale2 * z2_hat + beta2
+        # batch_mean2, batch_var2 = tf.nn.moments(conv2, [0, 1, 2])
+        # z2_hat = (conv2 - batch_mean2) / tf.sqrt(batch_var2 + epsilon)
+        # scale2 = tf.Variable(tf.ones([64]))
+        # beta2 = tf.Variable(tf.zeros([64]))
+        # conv2 = scale2 * z2_hat + beta2
         conv2 = tf.nn.relu(conv2)
 
         pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2, name='pool2')
         pool2_flat = tf.reshape(pool2, [-1, 8 * 8 * 64], name='flatten')
 
         dense1 = tf.layers.dense(inputs=pool2_flat, units=1024, activation=None, name='dense1')
-        batch_mean3, batch_var3 = tf.nn.moments(dense1, [0])
-        z3_hat = (dense1 - batch_mean3) / tf.sqrt(batch_var3 + epsilon)
-        scale3 = tf.Variable(tf.ones([1024]))
-        beta3 = tf.Variable(tf.zeros([1024]))
-        dense1 = scale3 * z3_hat + beta3
+        # batch_mean3, batch_var3 = tf.nn.moments(dense1, [0])
+        # z3_hat = (dense1 - batch_mean3) / tf.sqrt(batch_var3 + epsilon)
+        # scale3 = tf.Variable(tf.ones([1024]))
+        # beta3 = tf.Variable(tf.zeros([1024]))
+        # dense1 = scale3 * z3_hat + beta3
         self.dense1 = tf.nn.relu(dense1)
 
         dropout1 = tf.layers.dropout(inputs=self.dense1, rate=0.5, name='dropout1')
@@ -82,7 +82,7 @@ class Classifier(object):
         self.logits = tf.layers.dense(inputs=dropout1, units=1, name='logits')
 
         self.loss = tf.losses.sigmoid_cross_entropy(multi_class_labels=self.y, logits=self.logits)
-
+        self.prob = tf.nn.sigmoid(self.logits)
         self.predictions = tf.round(tf.nn.sigmoid(self.logits))
         self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predictions, self.y), tf.float32))
         self.opt = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(self.loss)
@@ -100,20 +100,23 @@ class Classifier(object):
         prob[1-int(cls)] = 1 - value
         return prob
 
+    def getAllProb(self, X_data):
+        return self.sess.run(self.prob, {self.x: X_data})
+
     def get_performance(self, X_train, Y_train, X_valid, Y_valid, new=False):
 
         accHist, lossHist = deque(), deque()
         start_time = time.time()
         t = 0
-        for epoch in range(8):
+        for epoch in range(2):
             # training
-            batchSize = 16
+            batchSize = 32
             for start, end in zip(range(0, len(X_train), batchSize), range(batchSize, len(X_train)+batchSize, batchSize)):
-                # if t % 10 == 0:
-                #     # testing
-                #     acc_valid, pred_valid, loss_valid = self.sess.run([self.accuracy, self.predictions, self.loss], {self.x: X_valid, self.y: Y_valid})
-                #     print("Validation: Step: %i" % t, "| Accurate: %.2f" % acc_valid, "| Loss: %.2f" % loss_valid, )
-                #     # print('')
+                if t % 10 == 0:
+                    # testing
+                    acc_valid, pred_valid, loss_valid = self.sess.run([self.accuracy, self.predictions, self.loss], {self.x: X_valid, self.y: Y_valid})
+                    print("Validation: Step: %i" % t, "| Accurate: %.2f" % acc_valid, "| Loss: %.2f" % loss_valid, )
+                    # print('')
                 _, acc_, pred_, loss_ = self.sess.run([self.opt, self.accuracy, self.predictions, self.loss],
                                                  {self.x: X_train[start:end], self.y: Y_train[start:end]})
                 # acc_valid, loss_valid = self.sess.run([self.accuracy, self.loss],

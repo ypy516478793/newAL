@@ -4,33 +4,51 @@ import random
 import scipy.ndimage
 import matplotlib.pyplot as plt
 
-def loadData():
+def normal(x):
+    return (x - np.min(x)) / (np.max(x) - np.min(x))
 
-    data = h5py.File('./data/Lung_Nodule_2d.h5', 'r')
-    X_train = data['X_train'][:]
-    Y_train = data['Y_train'][:]
-    X_valid = data['X_valid'][:]
-    Y_valid = data['Y_valid'][:]
-    data.close()
+def reformat(x, y, img_size, num_ch, num_class):
+    """ Reformats the data to the format acceptable for the conv layers"""
+    dataset = x.reshape(
+        (-1, img_size, img_size, num_ch)).astype(np.float32)
+    labels = (np.arange(num_class) == y[:, None]).astype(np.float32)
+    return dataset, labels
 
-    # X_train_ratate = random_rotation_2d(X_train, 180)
-    # X_train_noise = add_noise(X_train)
-    # X_train = np.concatenate([X_train, X_train_ratate, X_train_noise], axis=0)
-    # Y_train = np.tile(Y_train, 3)
+def loadData(dim=2, normalize='standard', one_hot=False):
+    if dim == 2:
+        h5f = h5py.File('./data/Lung_Nodule_2d.h5', 'r')
+        X_train = h5f['X_train'][:]
+        Y_train = h5f['Y_train'][:]
+        X_valid = h5f['X_valid'][:]
+        Y_valid = h5f['Y_valid'][:]
+        h5f.close()
 
-    X_train = np.reshape(X_train, (-1, X_train.shape[1] * X_train.shape[2]))
-    X_valid = np.reshape(X_valid, (-1, X_valid.shape[1] * X_valid.shape[2]))
+    image_size, num_classes, num_channels = X_train.shape[1], len(np.unique(Y_train)), 1
+    X_train = np.maximum(np.minimum(X_train, 4096.), 0.)
+    X_valid = np.maximum(np.minimum(X_valid, 4096.), 0.)
 
-    mean_train = np.mean(X_train, axis=0)
-    std_train = np.std(X_train, axis=0)
-    X_train = (X_train - mean_train) / std_train
+    if normalize == 'standard':
+        mt = np.mean(X_train, axis=0)
+        st = np.std(X_train, axis=0)
+        X_train = (X_train - mt) / st
+        mv= np.mean(X_valid, axis=0)
+        sv = np.std(X_valid, axis=0)
+        X_valid = (X_valid - mv) / sv
+    elif normalize == 'unity_based':
+        X_train = np.asanyarray([normal(X_train[i]) for i in range(len(X_train))])
+        X_valid = np.asanyarray([normal(X_valid[i]) for i in range(len(X_valid))])
 
-    mean_valid = np.mean(X_valid, axis=0)
-    std_valid = np.std(X_valid, axis=0)
-    X_valid = (X_valid - mean_valid) / std_valid
+    if one_hot:
+        X_train, Y_train = reformat(X_train, Y_train, image_size, num_channels, num_classes)
+        X_valid, Y_valid = reformat(X_valid, Y_valid, image_size, num_channels, num_classes)
+    elif not one_hot:
+        X_train, _ = reformat(X_train, Y_train, image_size, num_channels, num_classes)
+        X_valid, _ = reformat(X_valid, Y_valid, image_size, num_channels, num_classes)
 
-    Y_train = Y_train[:, np.newaxis]
-    Y_valid = Y_valid[:, np.newaxis]
+    X_train = X_train.reshape(-1, 32*32)
+    X_valid = X_valid.reshape(-1, 32*32)
+    Y_train = Y_train.reshape(-1, 1)
+    Y_valid = Y_valid.reshape(-1, 1)
 
     return X_train, Y_train, X_valid, Y_valid
 
@@ -79,10 +97,9 @@ def add_noise(batch, mean=0, var=0.1, amount=0.01, mode='pepper'):
     return batch_noisy.reshape(original_size)
 
 if __name__ == '__main__':
-    X_train, Y_train, X_valid, Y_valid = loadData()
-    X_train = X_train.reshape(-1, 32 ,32)
+    X_train, Y_train, X_valid, Y_valid = loadData(one_hot=False)
     X_new = add_noise(X_train[:5], 180)
-    print('rotated image: \n')
+    print('noisy image: \n')
     plt.figure()
     plt.imshow(X_new[0])
     plt.show()
