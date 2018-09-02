@@ -52,6 +52,34 @@ def loadData(dim=2, normalize='standard', one_hot=False):
 
     return X_train, Y_train, X_valid, Y_valid
 
+def randomize(x, y):
+    """ Randomizes the order of data samples and their corresponding labels"""
+    permutation = np.random.permutation(y.shape[0])
+    shuffled_x = x[permutation, :, :, :]
+    shuffled_y = y[permutation]
+    return shuffled_x, shuffled_y
+
+def precision_recall(y_true, y_pred):
+    """
+    Computes the precision and recall values for the positive class
+    :param y_true: true labels
+    :param y_pred: predicted labels
+    """
+    TP = FP = FN = TN = 0
+    for i in range(len(y_pred)):
+        if y_true[i] == 1 and y_pred[i] == 1:
+            TP += 1
+        elif y_true[i] == 0 and y_pred[i] == 1:
+            FP += 1
+        elif y_true[i] == 1 and y_pred[i] == 0:
+            FN += 1
+        elif y_true[i] == 0 and y_pred[i] == 0:
+            TN += 1
+    precision = (TP * 100.0) / (TP + FP)
+    recall = (TP * 100.0) / (TP + FN)
+    print('Precision: {0:.2f}'.format(precision))
+    print('Recall: {0:.2f}'.format(recall))
+
 def random_rotation_2d(batch, max_angle):
     """ Randomly rotate an image by a random angle (-max_angle, max_angle).
 
